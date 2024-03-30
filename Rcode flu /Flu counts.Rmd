@@ -1,0 +1,29 @@
+```{r setup, include=FALSE}
+#load libraries
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(ggplot2)
+library(lubridate)
+library(scoringutils)
+# library(RColorBrewer)
+# library(DT)
+# library(surveillance)
+# library(htmltools)
+# library(kableExtra)
+library(RColorBrewer)
+library(covidHubUtils)
+library (covidData)
+library(plotly)
+library(idforecastutils)
+library(tidyverse)
+# library(zoltr)
+library(dplyr)
+# library(desc)
+# library(SciViews)
+library(ggforce)
+theme_set(theme_bw())
+```
+
+```{r}
+
+```
+

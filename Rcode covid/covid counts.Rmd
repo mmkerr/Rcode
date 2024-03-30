@@ -1,4 +1,4 @@
-```{r}
+```{r load libraries}
 #Load libraries
 library(covidHubUtils)
 library(tidyverse)
@@ -15,12 +15,12 @@ library(RColorBrewer)
 library(plotly)
 ```
 
-```{r}
+```{r get data boundaries}
 #Get data boundaries
 the_locations <- hub_locations %>% filter(geo_type == "state") %>% pull(fips) #states, us and territories
 ```
 
-```{r}
+```{r create vector of hospitalization truth data}
 #Create vector of hospitalization truth data
 truth_dat_hosp_all <- load_truth(
   truth_source = "HealthData",
@@ -51,7 +51,7 @@ forecast_mon <- lubridate::floor_date(Sys.Date(), unit = "week") + 1      #Even 
 
 ```
 
-```{r}
+```{r define dates}
 #Create start date
 start_date <- as.Date("2023-01-01")
 #define current date to calculate 2 months back
@@ -71,7 +71,7 @@ destination <-paste0("/Users/mkerr/Documents/hospitalizations/", current_wed, "t
 
 ```
 
-```{r}
+```{r plot state hospitalizations}
 #Plot states  hospitalizations
 truthplot_states <- ggplot(data = Truth_states, aes(x = target_end_date, y = value)) +
     #geom_line(color = "black") +
@@ -89,7 +89,173 @@ truthplot_states
 
 ```
 
-```{r}
+```{r create PDF file}
+#Create pdf file
+pdf(file = "/Users/mkerr/Documents/hospitalizations/My plot.pdf", height = 24, width = 14)
+#test
+plots_with_free_y <- ggplot(data = Truth_states, aes(x = target_end_date, y = value)) +
+  #geom_line(color = "black") +
+  geom_point() +
+  geom_line(color = "black") +
+  scale_x_date(name = NULL, date_breaks="2 weeks", date_labels = "%m/%d") +
+  ylab(ylab) +
+  labs(title = paste("COVID-19 hospitalizations over the past 2 months"),
+       subtitle=paste("by state"),
+       caption="source: Healthdata (observed data)")+
+  theme(legend.position = c(.05,.95), legend.justification = c(0,1)) +
+  facet_wrap_paginate(~location_name, ncol = 5, nrow = 11, scales = "free")
+n_pages(truthplot_states)
+plots_with_free_y
+dev.off()
+
+```
+
+```{r plot different versions up until updated data}
+#Plotting different versions up until updated data
+current_thurs <- lubridate::floor_date(Sys.Date(), unit = "week") + 4
+current_sat <- lubridate::floor_date(Sys.Date(), unit = "week") + 6
+last_eval_sat <- as.Date(calc_target_week_end_date(forecast_mon, horizon = 0))
+test2_prelim <- load_truth(
+  as_of = '2024-03-29',
+  truth_source = "HealthData",
+  target_variable = c("inc hosp",the_locations),
+  temporal_resolution = "daily",
+  locations = the_locations,
+  data_location = "covidData"
+)
+Truth_states_final <- test2_prelim %>%
+  filter(location!="US" & target_end_date >= prior2m)
+Truth_states_final$as_of <- 20240329
+  test1_prelim <- load_truth(
+    as_of = '2024-03-27',
+    truth_source = "HealthData",
+    target_variable = c("inc hosp",the_locations),
+    temporal_resolution = "daily",
+    locations = the_locations,
+    data_location = "covidData"
+  )
+  Truth_states_prelim <- test1_prelim %>%
+    filter(location!="US" & target_end_date >= prior2m)
+  Truth_states_prelim$as_of <- 20240327
+  prior_week_prelim <- load_truth(
+    as_of = '2024-03-20',
+    truth_source = "HealthData",
+    target_variable = c("inc hosp",the_locations),
+    temporal_resolution = "daily",
+    locations = the_locations,
+    data_location = "covidData"
+  )
+  Prior_week_prelim <-prior_week_prelim %>%
+    filter(location!="US" & target_end_date >= prior2m)
+  Prior_week_prelim$as_of <- 20240320
+  test1_final <- load_truth(
+    as_of = '2024-03-22',
+    truth_source = "HealthData",
+    target_variable = c("inc hosp",the_locations),
+    temporal_resolution = "daily",
+    locations = the_locations,
+    data_location = "covidData"
+  )
+  Prior_week_final <- test1_final %>%
+    filter(location!="US" & target_end_date >= prior2m)
+  Prior_week_final$as_of <- 20240322
+  dplyr::bind_rows(Truth_states_final, Truth_states_prelim, Prior_week_prelim, Prior_week_final)
+  New_dataset <- dplyr::bind_rows(Truth_states_final, Truth_states_prelim, Prior_week_prelim, Prior_week_final)
+  class(New_dataset$as_of)
+  class(New_dataset$target_end_date)
+  New_dataset$as_of <- as.factor(as.character(New_dataset$as_of))
+  RColorBrewer::brewer.pal(n=4, name="Blues")
+  my_colors <- brewer.pal(n=9, name="Set1")[c(1,2,3,9)]
+  
+  pdf(file = "/Users/mkerr/Documents/hospitalizations/test_covid_hospitalizations.pdf", height = 24, width = 16)
+  Dplyrbind_plot <- ggplot(data = New_dataset, aes(x = target_end_date, y = value, color = as_of, group = as_of)) +
+    geom_line(aes(color = as_of)) +
+    ylim(0, NA) +
+    scale_x_date(name = NULL, date_breaks="2 weeks", date_labels = "%m/%d") +
+    scale_color_manual(values = my_colors, name="As\nof",
+                         breaks=c("20240320", "20240322", "20240327", "20240329"),
+                         labels=c("20240320" = "3/20", "20240322" = "3/22", "20240327" = "3/27", "20240329" = "3/29")) +
+    ylab(ylab) +
+    labs(title = paste("COVID-19 hospitalizations over the past 2 months"),
+         subtitle=paste("by state"),
+         caption="source: Healthdata (observed data)")+
+    theme_light() +
+    theme(legend.position = "top", legend.justification = c(0,1)) +
+    theme(legend.key.width=unit (2, "cm")) +
+    facet_wrap_paginate(~location_name, ncol = 5, nrow = 11, scales = "free")
+    #expand_limits(x = 0, y = 0)
+  n_pages(Dplyrbind_plot)
+  Dplyrbind_plot
+  dev.off()
+
+```
+
+```{r plot different versions up until prelim data}
+#Plotting different versions up until prelim data
+  current_thurs <- lubridate::floor_date(Sys.Date(), unit = "week") + 4
+  current_sat <- lubridate::floor_date(Sys.Date(), unit = "week") + 6
+  last_eval_sat <- as.Date(calc_target_week_end_date(forecast_mon, horizon = 0))
+  test1_prelim <- load_truth(
+    as_of = '2024-03-27',
+    truth_source = "HealthData",
+    target_variable = c("inc hosp",the_locations),
+    temporal_resolution = "daily",
+    locations = the_locations,
+    data_location = "covidData"
+  )
+  Truth_states_prelim <- test1_prelim %>%
+    filter(location!="US" & target_end_date >= prior2m)
+  Truth_states_prelim$as_of <- 20240327
+  prior_week_prelim <- load_truth(
+    as_of = '2024-03-20',
+    truth_source = "HealthData",
+    target_variable = c("inc hosp",the_locations),
+    temporal_resolution = "daily",
+    locations = the_locations,
+    data_location = "covidData"
+  )
+  Prior_week_prelim <-prior_week_prelim %>%
+    filter(location!="US" & target_end_date >= prior2m)
+  Prior_week_prelim$as_of <- 20240320
+  test1_final <- load_truth(
+    as_of = '2024-03-22',
+    truth_source = "HealthData",
+    target_variable = c("inc hosp",the_locations),
+    temporal_resolution = "daily",
+    locations = the_locations,
+    data_location = "covidData"
+  )
+  Prior_week_final <- test1_final %>%
+    filter(location!="US" & target_end_date >= prior2m)
+  Prior_week_final$as_of <- 20240322
+  dplyr::bind_rows(Truth_states_prelim, Prior_week_prelim, Prior_week_final)
+  New_dataset <- dplyr::bind_rows(Truth_states_prelim, Prior_week_prelim, Prior_week_final)
+  class(New_dataset$as_of)
+  class(New_dataset$target_end_date)
+  New_dataset$as_of <- as.factor(as.character(New_dataset$as_of))
+  RColorBrewer::brewer.pal(n=3, name="Blues")
+  my_colors <- brewer.pal(n=9, name="Set1")[c(1,2,9)]
+  
+  pdf(file = "/Users/mkerr/Documents/hospitalizations/test covid hospitalizations.pdf", height = 24, width = 16)
+  Dplyrbind_plot <- ggplot(data = New_dataset, aes(x = target_end_date, y = value, color = as_of, group = as_of)) +
+    geom_line(aes(color = as_of)) +
+    ylim(0, NA) +
+    scale_x_date(name = NULL, date_breaks="2 weeks", date_labels = "%m/%d") +
+    scale_color_manual(values = my_colors, name="As\nof",
+                       breaks=c("20240320", "20240322", "20240327"),
+                       labels=c("20240320" = "3/20", "20240322" = "3/22", "20240327" = "3/27")) +
+    ylab(ylab) +
+    labs(title = paste("COVID-19 hospitalizations over the past 2 months"),
+         subtitle=paste("by state"),
+         caption="source: Healthdata (observed data)")+
+    theme_light() +
+    theme(legend.position = "top", legend.justification = c(0,1)) +
+    theme(legend.key.width=unit (2, "cm")) +
+    facet_wrap_paginate(~location_name, ncol = 5, nrow = 11, scales = "free")
+  #expand_limits(x = 0, y = 0)
+  n_pages(Dplyrbind_plot)
+  Dplyrbind_plot
+  dev.off()
 
 ```
 
